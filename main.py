@@ -3,6 +3,7 @@ import sys
 import pygame
 
 import test_room
+import shop
 
 
 WIDTH = 1000
@@ -81,6 +82,7 @@ class StartPage:
 
         # магазины
         self.button_shops = Button(WIDTH // 3, HEIGHT // 2 + 1 * step + 1 * button_height, button_width, button_height, BLUE, "МАГАЗИНЫ", font_size, WHITE)
+        self.button_shops.set_func(shop.main)
         self.buttons.append(self.button_shops)
 
         # настройки
