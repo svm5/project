@@ -31,6 +31,46 @@ manager = pygame_gui.UIManager((WIDTH, HEIGHT))
 shop_clock = pygame.time.Clock()
 
 
+def camera_configure(camera, target_rect):
+    l, t, _, _ = target_rect
+    # print(t)
+    _, _, w, h = camera
+    # l, t = -l + WIDTH // 2, -t + HEIGHT // 2
+    t = -t
+
+    l = min(0, l)
+    l = max(-(camera.width - WIDTH), l)
+    # t = max(HEIGHT + 100, t)
+    # print(t)
+    t = min(0, t)
+    t = max(-500, t)
+    # print(t)
+    return pygame.Rect(l, t, w, h)      
+
+
+class Camera:
+    def __init__(self, camera_func, width, height):
+        self.func = camera_func
+        self.state = pygame.Rect(0, 0, width, height)
+
+    def apply(self, target):
+        return target.rect.move(self.state.topleft)
+
+    def update(self, target):
+        # print(self.state)
+        self.state = self.func(self.state, target.rect)
+        # print(self.state)
+
+
+class Point:
+    def __init__(self):
+        self.rect = pygame.Rect(0, 0, WIDTH, HEIGHT)
+    
+    def move(self, delta_y):
+        self.rect.y += delta_y
+        # print(self.rect.y)
+
+
 class Button(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y, width, height, color, text, text_size, text_color):
         super().__init__()
@@ -130,6 +170,20 @@ def main():
     # buttons.append(b)
     buttons_sprites.add(b)
 
+    total_width = WIDTH
+    total_height = STEP_X + 2 * CARD_HEIGHT + 2 * STEP_Y
+    camera = Camera(camera_configure, total_width, total_height)
+    p = Point()
+
+    arrow_back = pygame.sprite.Sprite()
+    arrow_back.image = pygame.image.load("res/icons/arrow_back.SVG")
+    # arrow_back.image = pygame.transform.scale(arrow_back.image, (WIDTH // 20, WIDTH // 20))
+    arrow_back.rect = arrow_back.image.get_rect()
+    arrow_back.rect.x = (STEP_X - arrow_back.rect.width) // 2
+    arrow_back.rect.y = (STEP_X - arrow_back.rect.width) // 2
+    static_elements = pygame.sprite.Group()
+    static_elements.add(arrow_back)
+
     pos_x = STEP_X
     pos_y = STEP_X
     for i in range(2):
@@ -149,7 +203,7 @@ def main():
             if event.type == pygame.MOUSEMOTION:
                 pos = pygame.mouse.get_pos()
                 for card, button in buttons:
-                    if button.check_mouse_position(pos):
+                    if button.check_mouse_position((pos[0], pos[1] + p.rect.y)):
                         # print(button)
                         # b.set_color(True)
                         # button.set_color(True)
@@ -161,24 +215,40 @@ def main():
                         # b.set_color(False)
                         card.button.set_color(False)
             if event.type == pygame.MOUSEBUTTONDOWN:
-                for card, button in buttons:
-                    if button.check_mouse_position(pos):
-                        for card2, button2 in buttons:
-                            if card2.button.get_text() != "Купить":
-                                card2.button.set_text("Надеть")
-                        card.button.set_text("Надето")
-                        message = pygame_gui.windows.UIMessageWindow(
-                            rect=pygame.Rect(250, 200, 300, 200),
-                            manager=manager,
-                            window_title="Сообщение",
-                            html_message=f"Предмет '{card.txt}' приобретён успешно!"
-                        )
-                        break
+                if event.button == 1:  # левая кнопка мыши
+                    for card, button in buttons:
+                        if button.check_mouse_position((pos[0], pos[1] + p.rect.y)):
+                            for card2, button2 in buttons:
+                                if card2.button.get_text() != "Купить":
+                                    card2.button.set_text("Надеть")
+                            if card.button.get_text() == "Купить":
+                                message = pygame_gui.windows.UIMessageWindow(
+                                    rect=pygame.Rect(250, 200, 300, 200),
+                                    manager=manager,
+                                    window_title="Сообщение",
+                                    html_message=f"Предмет '{card.txt}' приобретён успешно!"
+                                )
+                            card.button.set_text("Надето")
+                            break
+                    if arrow_back.rect.x <= event.pos[0] < arrow_back.rect.x + arrow_back.rect.width and \
+                            arrow_back.rect.y <= event.pos[1] < arrow_back.rect.y + arrow_back.rect.height:
+                        return
+                if event.button == 4:  # крутим вперёд
+                    p.move(-10)
+                if event.button == 5:  # крутим назад
+                    p.move(10)
             manager.process_events(event)
         screen.fill(pygame.Color(BACKGROUND_COLOR))
+        static_elements.draw(screen)
         buttons_sprites.update()
         cards_sprites.update()
-        cards_sprites.draw(screen)
+        # cards_sprites.draw(screen)
+        camera.update(p)
+        for card in cards_sprites:
+            camera.apply(card.button)
+            # print(card.button.rect)
+            screen.blit(card.image, camera.apply(card))
+            # print(card.rect)
         manager.update(time_delta)
         manager.draw_ui(screen)
         # buttons_sprites.draw(screen)
